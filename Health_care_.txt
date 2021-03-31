@@ -1,0 +1,565 @@
+import smbus
+import time
+import serial
+import os
+
+import board
+import busio as io
+import adafruit_mlx90614
+import time
+import RPi.GPIO as GPIO
+import time
+from twilio.rest import Client
+import random
+from time import sleep
+from picamera import PiCamera
+from os.path import split
+import requests
+# declaration for kepad start
+L1 = 5
+L2 = 6
+L3 = 13
+L4 = 19
+
+C1 = 12
+C2 = 16
+C3 = 20
+C4 = 21
+l1=[]
+l2=[]
+l3=[]
+l4=[]
+
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+
+GPIO.setup(L1, GPIO.OUT)
+GPIO.setup(L2, GPIO.OUT)
+GPIO.setup(L3, GPIO.OUT)
+GPIO.setup(L4, GPIO.OUT)
+
+GPIO.setup(C1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(C2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(C3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(C4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+#declaration for kepad end
+
+
+
+# the mlx90614 must be run at 100k [normal speed]
+# i2c default mode is is 400k [full speed]
+# the mlx90614 will not appear at the default 400k speed
+i2c = io.I2C(board.SCL, board.SDA, frequency=100000)
+mlx = adafruit_mlx90614.MLX90614(i2c)
+
+# temperature results in celsius
+
+
+
+# Define some device parameters
+I2C_ADDR  = 0x3F # I2C device address, if any error, change this address to 0x27
+LCD_WIDTH = 16   # Maximum characters per line
+
+# Define some device constants
+LCD_CHR = 1 # Mode - Sending data
+LCD_CMD = 0 # Mode - Sending command
+
+LCD_LINE_1 = 0x80 # LCD RAM address for the 1st line
+LCD_LINE_2 = 0xC0 # LCD RAM address for the 2nd line
+LCD_LINE_3 = 0x94 # LCD RAM address for the 3rd line
+LCD_LINE_4 = 0xD4 # LCD RAM address for the 4th line
+
+LCD_BACKLIGHT  = 0x08  # On
+#LCD_BACKLIGHT = 0x00  # Off
+
+ENABLE = 0b00000100 # Enable bit
+
+# Timing constants
+E_PULSE = 0.0005
+E_DELAY = 0.0005
+
+#Open I2C interface
+#bus = smbus.SMBus(0)  # Rev 1 Pi uses 0
+bus = smbus.SMBus(1) # Rev 2 Pi uses 1
+# for multipart to send image on server
+def send_face():
+    filepath = '/home/pi/face.jpg'
+    url = "url API for sending image file to server"
+
+    auth = ('api_key', 'api_secret')
+    payload = {'pk': '123456'}
+    files = { 'doc': (split(filepath)[-1], open(filepath,'rb')) }
+
+    response = requests.post(url, auth = auth, data = payload, files = files)
+    #print(response.json())
+    print(response)
+def send_adhar():
+    filepath = '/home/pi/adhar.jpg'
+    url = "url API for sending image file to server"
+
+    auth = ('api_key', 'api_secret')
+    payload = {'pk': '123456'}
+    files = { 'doc': (split(filepath)[-1], open(filepath,'rb')) }
+
+    response = requests.post(url, auth = auth, data = payload, files = files)
+    #print(response.json())
+    print(response)
+
+
+#for capture image
+
+def capture_face():
+
+
+    camera = PiCamera()
+    camera.resolution = (2024, 968)
+    camera.start_preview()
+    # Camera warm-up time
+    sleep(2)
+    camera.capture('face.jpg')
+    sleep(2)
+    camera.stop_preview()
+    send_face()
+def capture_adhar():
+
+
+    camera = PiCamera()
+    camera.resolution = (2024, 968)
+    camera.start_preview()
+    # Camera warm-up time
+    sleep(2)
+    camera.capture('adhar.jpg')
+    sleep(2)
+    camera.stop_preview()
+    send_adhar()
+
+#for readkeypad value start
+def readLine(line, characters):
+    listToStr = ''.join([str(elem) for elem in l1])
+    GPIO.output(line, GPIO.HIGH)
+    if(GPIO.input(C1) == 1):
+        if len(l1)<=9:
+            l1.append(characters[0])
+            listToStr = ''.join([str(elem) for elem in l1])
+            lcd_string(listToStr,LCD_LINE_1)
+        print(l1)
+        #print(characters[0])
+    if(GPIO.input(C2) == 1):
+        #print(characters[1])
+        if len(l1)<=9:
+            l1.append(characters[1])
+            listToStr = ''.join([str(elem) for elem in l1])
+            lcd_string(listToStr,LCD_LINE_1)
+        print(l1)
+    if(GPIO.input(C3) == 1):
+        #print(characters[2])
+        if len(l1)<=9:
+            l1.append(characters[2])
+            listToStr = ''.join([str(elem) for elem in l1])
+            lcd_string(listToStr,LCD_LINE_1)
+        print(l1)
+    if(GPIO.input(C4) == 1):
+        #print(characters[3])
+        if characters[3]=="D":
+            l1.pop()
+            listToStr = ''.join([str(elem) for elem in l1])
+            lcd_string(listToStr,LCD_LINE_1)
+        if characters[3]=="0":
+            if len(l1)<=9:
+                l1.append(characters[3])
+                listToStr = ''.join([str(elem) for elem in l1])
+                lcd_string(listToStr,LCD_LINE_1)
+        print(l1)
+    GPIO.output(line, GPIO.LOW)
+
+#for readkeypad value for mobile number end
+#for adhar keypad value
+def adharno():
+    lcd_string(">Enter adhar number:",LCD_LINE_1)
+    print("enter adhar number:")
+    try:
+        i=1
+        while i<250:
+            #print('vicky')
+            readLine2(L1, ["1","2","3","A"])
+            readLine2(L2, ["4","5","6","B"])
+            readLine2(L3, ["7","8","9","C"])
+            readLine2(L4, ["*","0","#","D"])
+
+            i += 1
+
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("\nApplication stopped!")
+#for adhar keypad value end
+#read keypad value for adhar start
+def readLine2(line, characters):
+    listToStr2 = ''.join([str(elem) for elem in l4])
+
+    GPIO.output(line, GPIO.HIGH)
+    if(GPIO.input(C1) == 1):
+        if len(l4)<=11:
+            l4.append(characters[0])
+            listToStr2 = ''.join([str(elem) for elem in l4])
+            lcd_string(listToStr2,LCD_LINE_1)
+        print(l4)
+        #print(characters[0])
+    if(GPIO.input(C2) == 1):
+        #print(characters[1])
+        if len(l4)<=11:
+            l4.append(characters[1])
+            listToStr2 = ''.join([str(elem) for elem in l4])
+            lcd_string(listToStr2,LCD_LINE_1)
+        print(l4)
+    if(GPIO.input(C3) == 1):
+        #print(characters[2])
+        if len(l4)<=11:
+            l4.append(characters[2])
+            listToStr2 = ''.join([str(elem) for elem in l4])
+            lcd_string(listToStr2,LCD_LINE_1)
+        print(l4)
+    if(GPIO.input(C4) == 1):
+        #print(characters[3])
+        if characters[3]=="D":
+            l4.pop()
+            listToStr2 = ''.join([str(elem) for elem in l4])
+            lcd_string(listToStr2,LCD_LINE_1)
+        if characters[3]=="0":
+            if len(l4)<=11:
+                l4.append(characters[3])
+                listToStr2 = ''.join([str(elem) for elem in l4])
+                lcd_string(listToStr2,LCD_LINE_1)
+        print(l4)
+    GPIO.output(line, GPIO.LOW)
+#read keypad value for adhar end
+# read keypad value for OTP start
+
+def readLine1(line, characters):
+    listToStr1 = ''.join([str(elem) for elem in l3])
+
+    GPIO.output(line, GPIO.HIGH)
+    if(GPIO.input(C1) == 1):
+        if len(l3)<=3:
+            l3.append(characters[0])
+            listToStr1 = ''.join([str(elem) for elem in l3])
+            lcd_string(listToStr1,LCD_LINE_1)
+        print(l3)
+        #print(characters[0])
+    if(GPIO.input(C2) == 1):
+        #print(characters[1])
+        if len(l3)<=3:
+            l3.append(characters[1])
+            listToStr1 = ''.join([str(elem) for elem in l3])
+            lcd_string(listToStr1,LCD_LINE_1)
+        print(l3)
+    if(GPIO.input(C3) == 1):
+        #print(characters[2])
+        if len(l3)<=3:
+            l3.append(characters[2])
+            listToStr1 = ''.join([str(elem) for elem in l3])
+            lcd_string(listToStr1,LCD_LINE_1)
+        print(l3)
+    if(GPIO.input(C4) == 1):
+        #print(characters[3])
+        if characters[3]=="D":
+            l3.pop()
+            listToStr1 = ''.join([str(elem) for elem in l3])
+            lcd_string(listToStr1,LCD_LINE_1)
+        if characters[3]=="0":
+            if len(l3)<=3:
+                l3.append(characters[3])
+                listToStr1 = ''.join([str(elem) for elem in l3])
+                lcd_string(listToStr1,LCD_LINE_1)
+        print(l3)
+    GPIO.output(line, GPIO.LOW)
+#readkeypad value for OTP end
+
+
+#for enter mobile no
+
+def mobile():
+    lcd_string(">Enter mobile no:",LCD_LINE_1)
+    print("enter mobile no:")
+    try:
+        i=1
+        while i<250:
+            #print('vicky')
+            readLine(L1, ["1","2","3","A"])
+            readLine(L2, ["4","5","6","B"])
+            readLine(L3, ["7","8","9","C"])
+            readLine(L4, ["*","0","#","D"])
+
+            i += 1
+
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("\nApplication stopped!")
+
+
+def sendmsg():
+    listToStr = ''.join([str(elem) for elem in l1])
+
+    n = random.randint(1000,5000)
+    n2=str(n)
+    l2.append(n)
+    print(l2)
+    account_sid = 'put your account_sid'
+    auth_token = 'put your auth_token'
+    client = Client(account_sid, auth_token)
+
+    message = client.messages \
+                    .create(
+                         body="Your OTP is:"+n2,
+                         from_='+1256_put your account generated number',
+                         to='+91 '+listToStr
+
+                     )
+
+    print(message.sid)
+#OTP read keypad value for OTP start
+def OTP12():
+
+    try:
+        i=1
+        while i<250:
+            #print('vicky')
+            readLine1(L1, ["1","2","3","A"])
+            readLine1(L2, ["4","5","6","B"])
+            readLine1(L3, ["7","8","9","C"])
+            readLine1(L4, ["*","0","#","D"])
+
+            i += 1
+
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("\nApplication stopped!")
+
+
+# read keypad value for OTP end
+
+def lcd_init():
+ # Initialise display
+ lcd_byte(0x33,LCD_CMD) # 110011 Initialise
+ lcd_byte(0x32,LCD_CMD) # 110010 Initialise
+ lcd_byte(0x06,LCD_CMD) # 000110 Cursor move direction
+ lcd_byte(0x0C,LCD_CMD) # 001100 Display On,Cursor Off, Blink Off 
+ lcd_byte(0x28,LCD_CMD) # 101000 Data length, number of lines, font size
+ lcd_byte(0x01,LCD_CMD) # 000001 Clear display
+ time.sleep(E_DELAY)
+
+def lcd_byte(bits, mode):
+ # Send byte to data pins
+ # bits = the data
+ # mode = 1 for data
+ #        0 for command
+
+ bits_high = mode | (bits & 0xF0) | LCD_BACKLIGHT
+ bits_low = mode | ((bits<<4) & 0xF0) | LCD_BACKLIGHT
+
+ # High bits
+ bus.write_byte(I2C_ADDR, bits_high)
+ lcd_toggle_enable(bits_high)
+
+ # Low bits
+ bus.write_byte(I2C_ADDR, bits_low)
+ lcd_toggle_enable(bits_low)
+
+def lcd_toggle_enable(bits):
+ # Toggle enable
+ time.sleep(E_DELAY)
+ bus.write_byte(I2C_ADDR, (bits | ENABLE))
+ time.sleep(E_PULSE)
+ bus.write_byte(I2C_ADDR,(bits & ~ENABLE))
+ time.sleep(E_DELAY)
+
+def lcd_string(message,line):
+ # Send string to display
+
+ message = message.ljust(LCD_WIDTH," ")
+
+ lcd_byte(line, LCD_CMD)
+
+ for i in range(LCD_WIDTH):
+   lcd_byte(ord(message[i]),LCD_CHR)
+
+def main():
+    lcd_init()
+ # Main program block
+
+ # Initialise display
+
+os.system('mpg321 /home/pi/project_audio/before_check.mp3 &')
+time.sleep(7)
+while True:
+    data5=requests.get("put your get API url")
+    data6=data5.text
+    if "Pending" in data6:
+
+
+     #serial communication code oxymeter data from arduino
+
+        list1=[]
+        spolis=[]
+        i=0
+        while i<15:
+
+
+                #time.sleep(5)
+            ser = serial.Serial('/dev/ttyUSB1',115200)
+            time.sleep(4)
+            ser_bytes = ser.readline()
+                #print(ser_bytes)
+            v=str(ser_bytes)
+            s=''.join(x for x in v if x.isdigit())
+            print(s)
+                #BPM=s[0:3]
+            try:
+                spo2=int(s)
+            except:
+                pass
+            if spo2<100:
+                spolis.append(spo2)
+            i+=1
+
+        maxspo2=max(spolis)
+
+
+        print("SPO2 is:",maxspo2)
+                #code for thermameter
+        ob=(mlx.object_temperature * 9/5) + 32
+               # print("Ambent Temp: ", am)
+        print("bodyTemp: ", ob)
+        ob1=str(ob)
+
+        time.sleep(1)
+                #print("new")
+               # Send some test
+        lcd_string(ob1,LCD_LINE_1)
+                 #lcd_string("> Welcome",LCD_LINE_2)  # Send some more text lcd_string("> Tutorial Url:",LCD_LINE_1)
+        lcd_string("> body temp",LCD_LINE_2)
+        if ob<100 and maxspo2>90:#for normal
+            time.sleep(10)     
+            os.system('mpg321 /home/pi/project_audio/enter_aadhar1.mp3 &')
+            time.sleep(5)
+            adharno()
+                    #send data to server for unsuspected start
+            filepath = '/home/pi/face.jpg'
+            url = "url API for unsuspected image file sending to server"
+
+            auth = ('api_key', 'api_secret')
+            listToStr2 = ''.join([str(elem) for elem in l4])
+            listToStr = ''.join([str(elem) for elem in l1])
+            payload = {"uid":listToStr2,"sensor1":ob1,"sensor2":maxspo2,"status":"unsuspected"}
+
+
+            response = requests.post(url, auth = auth, data = payload)
+                    #print(response.json())
+            print(response)
+            print(response.text)
+            time.sleep(10)
+            os.system('mpg321 /home/pi/project_audio/after1.mp3 &')
+            time.sleep(10)
+            list1.clear()
+            spolis.clear()
+            l1.clear()
+            l2.clear()
+            l3.clear()
+            l4.clear()
+                    #send data to server for unsuspected end
+
+        if ob >101 or maxspo2<90:
+
+            print("suspecte detect")
+                    #os.system('mpg321 /home/pi/project_audio/abnormal.mp3 &')
+                    #time.sleep(4)
+            time.sleep(5)
+            os.system('mpg321 /home/pi/project_audio/enter_aadhar.mp3 &')
+            time.sleep(5)
+            adharno()
+
+                    #capture_face()
+            os.system('mpg321 /home/pi/project_audio/camera.mp3 &')
+            time.sleep(4)
+            camera = PiCamera()
+            camera.resolution = (2024, 968)
+            camera.start_preview()
+                    # Camera warm-up time
+            sleep(5)
+            camera.capture('face.jpg')
+            sleep(2)
+            camera.stop_preview()
+            camera.close()
+            time.sleep(3)
+            os.system('mpg321 /home/pi/project_audio/camera_shutter.mp3 &')
+            time.sleep(1)
+                    #print("img send1")
+
+                    #send_face()
+
+
+                    #capture_adhar()
+
+
+                    #send_adhar()
+            time.sleep(10)
+            os.system('mpg321 /home/pi/project_audio/enter_mobile.mp3 &')
+            time.sleep(7)
+            mobile()
+            sendmsg()
+            time.sleep(15)
+            print("enter OTP")
+            lcd_string(">Enter OTP :",LCD_LINE_1)
+            os.system('mpg321 /home/pi/project_audio/enter_otp.mp3 &')
+            time.sleep(6)
+            OTP12()
+            listToStr1 = ''.join([str(elem) for elem in l3])
+            con=int(listToStr1)
+            if int(l2[len(l2)-1]) ==con:
+
+                print("success")
+                listToStr2 = ''.join([str(elem) for elem in l4])
+                listToStr = ''.join([str(elem) for elem in l1])
+                filepath = '/home/pi/face.jpg'
+                url = "url API for suspected image file sending to server"
+
+                auth = ('api_key', 'api_secret')
+    #payload = {'pk': '123456'}
+                payload = {"uid":listToStr2,"sensor1":ob1,"sensor2":maxspo2,"status":"suspected","mobile":listToStr}
+                files = { 'doc': (split(filepath)[-1], open(filepath,'rb')) }
+
+                response = requests.post(url, auth = auth, data = payload, files = files)
+                    #print(response.json())
+                print(response)
+                print(response.text)
+                lcd_string(">success:",LCD_LINE_1)
+
+                os.system('mpg321 /home/pi/project_audio/Last.mp3 &')
+                time.sleep(11)
+                list1.clear()
+                spolis.clear()
+                l1.clear()
+                l2.clear()
+                l3.clear()
+                l4.clear()
+
+
+
+
+
+
+
+
+
+time.sleep(3)
+
+
+if __name__ == '__main__':
+
+ try:
+   main()
+ except KeyboardInterrupt:
+   pass
+ finally:
+   lcd_byte(0x01, LCD_CMD)
